@@ -245,6 +245,48 @@
     .form-row{ grid-template-columns: 1fr !important; }
     .topbar-inner{ flex-direction: column; gap: 12px; align-items: flex-start; }
     .tabs{ padding: 4px; }
+ /* --- RHINO LUX PREMIUM LOOK ADD-ON --- */
+body {
+    position: relative;
+    background-color: #f4f6f9 !important;
+}
+
+/* Background Watermark Layout matching image_6382d2.jpg */
+body::before {
+    content: "";
+    position: fixed;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 650px;
+    height: 650px;
+    background-image: url('RLPL-3.png');
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    opacity: 0.08; /* Light watermark effect */
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Premium Top Orange Border on Header */
+header, .header, #header {
+    border-top: 5px solid #f2721c !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Enhancing Desktop View Card Shadows */
+.metric-card, .card, [class*="-card"] {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.04) !important;
+    border-radius: 10px !important;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover, .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.07) !important;
+}
+/* --- END OF ADD-ON --- */
   }
 </style>
 </head>
