@@ -169,6 +169,12 @@
     border-left: 4px solid var(--brand-orange);
   }
 
+  .alert-toast{
+    background: var(--good-bg); border: 1px solid var(--good); border-radius: 6px;
+    padding: 12px; font-size: 14px; color: var(--good); margin-bottom: 16px;
+    font-weight: 600; display: none;
+  }
+
   .form-row{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .form-row:has(.form-field:nth-child(2):last-child){ grid-template-columns: 1fr 1fr; }
   .form-field{ display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
@@ -303,13 +309,13 @@
     editingVisitId: null,
     editingPartyId: null,
     editingSpId: null,
-    selectedFormSpId: '', /* Track dynamic selection in Log a Visit form */
+    selectedFormSpId: '',
     modal: null,
-    logFilters: { sp:'all', party:'all', month:'all', search:'' }
+    logFilters: { sp:'all', party:'all', month:'all', search:'' },
+    showSuccessToast: false /* To show immediate inline confirmation toast */
   };
 
   function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-
   function esc(str){
     if(str === undefined || str === null) return '';
     return String(str).replace(/[&<>"']/g, function(c){
@@ -602,7 +608,6 @@
   function renderAddVisit(){
     const editing = state.editingVisitId ? state.visits.find(function(v){ return v.id===state.editingVisitId; }) : null;
     
-    // Set initial selected sales person ID if editing
     if (editing && !state.selectedFormSpId) {
       state.selectedFormSpId = editing.spId;
     }
@@ -611,7 +616,6 @@
       return '<option value="' + s.id + '"' + (state.selectedFormSpId===s.id ? ' selected':'') + '>' + esc(s.name) + '</option>'; 
     }).join('');
 
-    // DYNAMIC FILTER LOGIC: Filter clients based on selected Sales Person
     let filteredParties = [];
     if (state.selectedFormSpId) {
       filteredParties = state.parties.filter(function(p) { return p.assignedSpId === state.selectedFormSpId; });
@@ -634,6 +638,8 @@
     return ''
     + '<div class="view-head"><div><div class="eyebrow">Field Activity Portal</div><h2>' + (editing?'Update Visit Record':'Log Executed Field Visit') + '</h2></div></div>'
     + '<div class="panel panel--form">'
+    // DYNAMIC SUCCESS TOAST FOR MASS DATA ENTRY FEEDBACK
+    + '<div class="alert-toast" id="successToast" style="' + (state.showSuccessToast ? 'display:block;' : 'display:none;') + '">✔ Entry Saved Successfully! Ready for next record.</div>'
     + (blocked
         ? '<div class="notice">Configuration incomplete: Please make sure both Sales Persons and Clients are added before logging a visit.</div>'
         : '<form id="visitForm">'
@@ -869,7 +875,8 @@
       state.editingVisitId = null; 
       state.editingPartyId = null; 
       state.editingSpId = null; 
-      state.selectedFormSpId = ''; /* Reset temporary form selection on tab switch */
+      state.selectedFormSpId = '';
+      state.showSuccessToast = false;
       render(); 
       return; 
     }
@@ -899,9 +906,32 @@
       const date = document.getElementById('vDate').value; const discussion = document.getElementById('vDiscussion').value.trim();
       const outcome = document.getElementById('vOutcome').value.trim(); const existingId = document.getElementById('vId').value;
       if(!spId || !partyId || !date || !discussion) return;
+      
       const targetId = existingId ? existingId : uid('v');
       await saveVisitCloud(targetId, { spId:spId, partyId:partyId, date:date, discussion:discussion, outcome:outcome });
-      state.editingVisitId = null; state.selectedFormSpId = ''; state.tab = 'visitlog'; render();
+      
+      // FIXED LOGIC: If editing, go back to logs. If creating new, KEEP ON FORM for 100+ items mass entry!
+      if (existingId) {
+        state.editingVisitId = null;
+        state.selectedFormSpId = '';
+        state.tab = 'visitlog';
+        render();
+      } else {
+        state.selectedFormSpId = ''; // Reset selection for fresh input flow
+        state.showSuccessToast = true; // Show inline success feedback
+        render();
+        
+        // Auto-focus back onto the Sales Person Dropdown instantly
+        const inputFocus = document.getElementById('vSp');
+        if(inputFocus) inputFocus.focus();
+        
+        // Clear success notification toast after 3 seconds dynamically
+        setTimeout(function(){
+          state.showSuccessToast = false;
+          const toast = document.getElementById('successToast');
+          if(toast) toast.style.display = 'none';
+        }, 3000);
+      }
     }
     else if(e.target.id === 'partyForm'){
       const name = document.getElementById('pName').value.trim(); const location = document.getElementById('pLocation').value.trim();
@@ -927,13 +957,10 @@
     else if(e.target.id === 'logSpFilter'){ state.logFilters.sp = e.target.value; render(); }
     else if(e.target.id === 'logPartyFilter'){ state.logFilters.party = e.target.value; render(); }
     else if(e.target.id === 'logMonthFilter'){ state.logFilters.month = e.target.value; render(); }
-    
-    // CREATIVE FLOW DETECTOR: Trigger re-render when Sales Person changes in Log a Visit form
     else if(e.target.id === 'vSp'){ 
       state.selectedFormSpId = e.target.value; 
       render(); 
     }
-    
     else if(e.target.dataset && e.target.dataset.action === 'assign-party'){ const pid = e.target.dataset.id; await savePartyCloud(pid, { assignedSpId: e.target.value }); }
   });
 
