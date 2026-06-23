@@ -224,13 +224,6 @@
   .pulse__cell{ width: 14px; height: 14px; border-radius: 3px; background: #E5E7EB; }
   .pulse__cell--filled{ background: var(--brand-orange); }
 
-  .activity-list{ display: flex; flex-direction: column; gap: 14px; }
-  .activity-item{ display: flex; gap: 20px; padding: 16px; background: rgba(249, 250, 251, 0.9); border-radius: 6px; border-left: 4px solid var(--brand-orange); border-top: 1px solid var(--hide-light); border-right: 1px solid var(--hide-light); border-bottom: 1px solid var(--hide-light); }
-  .activity-item__date{ width: 100px; flex-shrink: 0; font-size: 13px; color: var(--hide); font-weight: 700; text-transform: uppercase; }
-  .activity-item__body{ flex: 1; }
-  .activity-item__title{ font-size: 15px; margin-bottom: 4px; color: #111827; }
-  .activity-item__note{ font-size: 14px; color: #4B5563; font-style: italic; }
-
   .empty-state{ color: var(--hide); font-size: 14px; padding: 32px 0; text-align: center; font-style: italic; }
   .loading-state{ color: var(--brand-orange); font-size: 16px; font-weight: 600; padding: 80px 0; text-align: center; font-family: var(--font-display); }
 
@@ -383,26 +376,6 @@
     return vs.length ? vs[0].date : null;
   }
 
-  function pulseMonths(refMk, count){
-    const arr = []; let mk = refMk;
-    for(let i=0;i<count;i++){ arr.unshift(mk); mk = shiftMonth(mk,-1); }
-    return arr;
-  }
-  function renderPulse(partyId, refMk){
-    const months = pulseMonths(refMk, 6);
-    return '<div class="pulse">' + months.map(function(mk){
-      const visited = visitsInMonthForParty(partyId, mk).length > 0;
-      return '<span class="pulse__cell' + (visited?' pulse__cell--filled':'') + '" title="' + esc(monthLabel(mk)) + ': ' + (visited?'visited':'no visit') + '"></span>';
-    }).join('') + '</div>';
-  }
-  function renderPulseForSp(partyId, spId, refMk){
-    const months = pulseMonths(refMk, 6);
-    return '<div class="pulse">' + months.map(function(mk){
-      const visited = visitedInMonthBySp(spId, partyId, mk);
-      return '<span class="pulse__cell' + (visited?' pulse__cell--filled':'') + '" title="' + esc(monthLabel(mk)) + ': ' + (visited?'visited':'no visit') + '"></span>';
-    }).join('') + '</div>';
-  }
-
   function buildMonthOptionsForDashboard(selectedMk){
     const set = new Set(state.visits.map(function(v){ return v.date.slice(0,7); }));
     set.add(currentMonthKey());
@@ -495,10 +468,6 @@
         return a.last.localeCompare(b.last);
       });
 
-    const recent = state.visits.slice().sort(function(a,b){
-      return b.date.localeCompare(a.date) || String(b.id).localeCompare(String(a.id));
-    }).slice(0,6);
-
     return ''
     + '<div class="stat-grid">'
     +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
@@ -516,7 +485,6 @@
                 return '<tr class="' + (r.notVisitedCount>0?'row--alert':'') + '">'
                   + '<td><strong>' + esc(r.sp.name) + '</strong></td><td>' + esc(r.sp.region||'—') + '</td>'
                   + '<td>' + r.assignedCount + '</td><td><span class="badge badge--good">' + r.visitedCount + '</span></td>'
-                  // FIXED LOGIC: Removed the redundant "Pending" text inside the badge to keep only the pure number as requested
                   + '<td>' + (r.notVisitedCount > 0 ? '<span class="badge badge--alert">' + r.notVisitedCount + '</span>' : '0') + '</td>'
                   + '<td><strong>' + (r.pct===null ? '—' : r.pct + '%') + '</strong></td></tr>';
               }).join('')
@@ -542,18 +510,7 @@
         ? '<div class="panel"><div class="panel__head"><div class="eyebrow">Configuration</div><h3>Unassigned Clients Detected</h3></div>'
           + '<div class="notice">Following clients are unassigned: '
           + unassigned.map(function(p){ return '<strong>'+esc(p.name)+'</strong>'; }).join(', ') + '. Assign them to a team member in the <strong>Parties</strong> tab.</div></div>'
-        : '')
-
-    + '<div class="panel">'
-    +   '<div class="panel__head"><div class="eyebrow">Live Feed</div><h3>Recent Field Visits</h3></div>'
-    +   (recent.length === 0
-          ? '<div class="empty-state">No field activity tracked yet.</div>'
-          : '<div class="activity-list">' + recent.map(function(v){
-              return '<div class="activity-item"><div class="activity-item__date">' + esc(dateLabel(v.date)) + '</div>'
-                + '<div class="activity-item__body"><div class="activity-item__title"><strong>' + esc(spName(v.spId)) + '</strong> visited <strong>' + esc(partyName(v.partyId)) + '</strong></div>'
-                + '<div class="activity-item__note">“' + esc(v.discussion) + '”</div></div></div>';
-            }).join('') + '</div>')
-    + '</div>';
+        : '');
   }
 
   function renderDashboardForSalesperson(spId, mk){
@@ -580,18 +537,16 @@
     +   '<div class="panel__head"><div class="eyebrow">Account Matrix</div><h3>' + esc(spLabel) + ' — Client Status</h3></div>'
     +   (assigned.length === 0
           ? '<div class="empty-state">No clients assigned to this sales person.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client Name</th><th>Location</th><th>Status</th><th>Last Visit Date</th><th>6-Month History</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client Name</th><th>Location</th><th>Status</th><th>Last Visit Date</th></tr></thead><tbody>'
             + notVisited.map(function(c){
                 return '<tr class="row--alert"><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.location||'—') + '</td>'
                   + '<td><span class="badge badge--alert">No Visit</span></td>'
-                  + '<td>' + (c.lastVisit ? esc(dateLabel(c.lastVisit)) : 'Never') + '</td>'
-                  + '<td>' + renderPulseForSp(c.id, spId, mk) + '</td></tr>';
+                  + '<td>' + (c.lastVisit ? esc(dateLabel(c.lastVisit)) : 'Never') + '</td></tr>';
               }).join('')
             + visited.map(function(c){
                 return '<tr><td><strong>' + esc(c.name) + '</strong></td><td>' + esc(c.location||'—') + '</td>'
                   + '<td><span class="badge badge--good">Visited</span></td>'
-                  + '<td>' + esc(dateLabel(c.lastVisit)) + '</td>'
-                  + '<td>' + renderPulseForSp(c.id, spId, mk) + '</td></tr>';
+                  + '<td>' + esc(dateLabel(c.lastVisit)) + '</td></tr>';
               }).join('')
             + '</tbody></table></div>')
     + '</div>';
@@ -724,14 +679,13 @@
     + '<div class="panel">'
     +   (sorted.length===0
           ? '<div class="empty-state">No clients registered yet.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Company Name</th><th>Area Location</th><th>Contact Details</th><th>Assigned Sales Person</th><th>Total Visits</th><th>Last Visit</th><th>6-Month Status</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Company Name</th><th>Area Location</th><th>Contact Details</th><th>Sales Person</th><th>Total Visits</th><th>Actions</th></tr></thead><tbody>'
             + sorted.map(function(p){
-                const vs = visitsForParty(p.id); const last = vs.length ? vs[0].date : null;
+                const vs = visitsForParty(p.id);
                 return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.location||'—') + '</td>'
                   + '<td>' + esc(p.contact||'—') + (p.phone?' <br><span style="color:var(--hide); font-size:12px;">'+esc(p.phone)+'</span>':'') + '</td>'
                   + '<td><select data-action="assign-party" data-id="' + p.id + '" style="padding:4px 8px; font-size:13px; font-weight:600;">' + assignOptions(p.assignedSpId) + '</select></td>'
-                  + '<td><span class="badge badge--good" style="background:#EFF6FF; color:#1D4ED8; border:none;">' + vs.length + '</span></td><td>' + (last?esc(dateLabel(last)):'<span style="color:var(--alert)">No Visits Yet</span>') + '</td>'
-                  + '<td>' + renderPulse(p.id, currentMonthKey()) + '</td>'
+                  + '<td><span class="badge badge--good" style="background:#EFF6FF; color:#1D4ED8; border:none;">' + vs.length + '</span></td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="view-party" data-id="' + p.id + '">History</button>'
                   + '<button class="link-btn" data-action="edit-party" data-id="' + p.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-party" data-id="' + p.id + '">Delete</button></td></tr>';
@@ -762,13 +716,13 @@
     + '<div class="panel">'
     +   (sorted.length===0
           ? '<div class="empty-state">No sales team members found.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person Name</th><th>Region Location</th><th>Assigned Clients</th><th>Total Visits Logged</th><th>Unique Clients Met</th><th>Last Active Date</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person Name</th><th>Region Location</th><th>Assigned Clients</th><th>Last Active Date</th><th>Actions</th></tr></thead><tbody>'
             + sorted.map(function(s){
-                const vs = visitsForSp(s.id); const distinctParties = new Set(vs.map(function(v){ return v.partyId; })).size;
+                const vs = visitsForSp(s.id);
                 const last = vs.length ? vs[0].date : null; const assignedCount = partiesAssignedTo(s.id).length;
                 return '<tr><td><strong>' + esc(s.name) + '</strong></td><td>' + esc(s.region||'—') + '</td>'
                   + '<td><strong>' + assignedCount + ' clients</strong></td>'
-                  + '<td>' + vs.length + ' entries</td><td>' + distinctParties + ' clients</td><td>' + (last?esc(dateLabel(last)):'In-Active') + '</td>'
+                  + '<td>' + (last?esc(dateLabel(last)):'In-Active') + '</td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="view-sp" data-id="' + s.id + '">Logs Trail</button>'
                   + '<button class="link-btn" data-action="edit-sp" data-id="' + s.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-sp" data-id="' + s.id + '">Remove</button></td></tr>';
