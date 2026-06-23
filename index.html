@@ -101,7 +101,7 @@
   }
   .brand__title-block { display: flex; flex-direction: column; }
   .brand__name{ font-family: var(--font-display); font-weight: 700; font-size: 26px; letter-spacing: 0.5px; color: #111827; }
-  .brand__sub{ font-size: 13px; color: var(--brand-orange); font-weight: 600; letter-spacing: 0.3px; }
+  .brand__sub{ font-size: 14px; color: var(--brand-orange); font-weight: 600; letter-spacing: 0.3px; }
 
   .tabs{
     display: flex; gap: 8px; max-width: 1202px; margin: 0 auto 28px;
@@ -220,9 +220,9 @@
   .filter-bar input{ flex: 2; min-width: 250px; }
   .filter-bar select{ flex: 1; min-width: 180px; }
 
-  .pulse{ display: flex; gap: 5px; }
-  .pulse__cell{ width: 14px; height: 14px; border-radius: 3px; background: #E5E7EB; }
-  .pulse__cell--filled{ background: var(--brand-orange); }
+  .pulse{ display: flex; gap: 5px; align-items: center; }
+  .pulse__cell{ width: 12px; height: 12px; border-radius: 2px; background: #E5E7EB; border: 1px solid #D1D5DB; }
+  .pulse__cell--filled{ background: var(--brand-orange); border-color: #EA580C; }
 
   .empty-state{ color: var(--hide); font-size: 14px; padding: 32px 0; text-align: center; font-style: italic; }
   .loading-state{ color: var(--brand-orange); font-size: 16px; font-weight: 600; padding: 80px 0; text-align: center; font-family: var(--font-display); }
@@ -256,7 +256,7 @@
         <img class="brand__logo-img" src="RLPL-3.png" alt="Rhino Lux Logo">
         <div class="brand__title-block">
           <div class="brand__name">RHINO LUX</div>
-          <div class="brand__sub">Sales Field Intelligence & Customer Coverage Platform</div>
+          <div class="brand__sub">Sales Tracker</div>
         </div>
       </div>
     </div>
@@ -318,15 +318,6 @@
     return names[m-1] + ' ' + y;
   }
 
-  function shiftMonth(mk, delta){
-    const parts = mk.split('-');
-    let y = Number(parts[0]), m = Number(parts[1]);
-    m += delta;
-    while(m<1){ m+=12; y-=1; }
-    while(m>12){ m-=12; y+=1; }
-    return y + '-' + String(m).padStart(2,'0');
-  }
-
   function dateLabel(dateStr){
     if(!dateStr) return '—';
     const d = new Date(dateStr + 'T00:00:00');
@@ -370,10 +361,25 @@
   function visitedInMonthBySp(spId, partyId, mk){
     return state.visits.some(function(v){ return v.spId===spId && v.partyId===partyId && v.date.slice(0,7)===mk; });
   }
+  
   function lastVisitByForParty(spId, partyId){
     const vs = state.visits.filter(function(v){ return v.spId===spId && v.partyId===partyId; })
       .sort(function(a,b){ return b.date.localeCompare(a.date); });
     return vs.length ? vs[0].date : null;
+  }
+
+  function renderPulseBlocksForParty(partyId) {
+    const vs = visitsForParty(partyId);
+    let html = '<div class="pulse">';
+    for(let i=0; i<5; i++) {
+      if (i < vs.length) {
+        html += '<div class="pulse__cell pulse__cell--filled"></div>';
+      } else {
+        html += '<div class="pulse__cell"></div>';
+      }
+    }
+    html += '</div>';
+    return html;
   }
 
   function buildMonthOptionsForDashboard(selectedMk){
@@ -470,10 +476,10 @@
 
     return ''
     + '<div class="stat-grid">'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visits This Month</div><div class="stat-card__value">' + visitsThisMonth + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Sales Team</div><div class="stat-card__value">' + teamSize + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Client Visits</div><div class="stat-card__value" style="color: var(--alert);">' + totalNotVisitedAssigned + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visits This Month</div><div class="stat-card__value">' + visitsThisMonth + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Sales Team</div><div class="stat-card__value">' + teamSize + '</div></div>'
+    +   '<div class="stat-card" style="border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Client Visits</div><div class="stat-card__value" style="color: var(--alert);">' + totalNotVisitedAssigned + '</div></div>'
     + '</div>'
 
     + '<div class="panel">'
@@ -528,10 +534,10 @@
 
     return ''
     + '<div class="stat-grid">'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Portfolio</div><div class="stat-card__value">' + assigned.length + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visited This Month</div><div class="stat-card__value">' + visited.length + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Visits</div><div class="stat-card__value" style="color: var(--alert);">' + notVisited.length + '</div></div>'
-    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Logs</div><div class="stat-card__value">' + myVisits.length + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Portfolio</div><div class="stat-card__value">' + assigned.length + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visited This Month</div><div class="stat-card__value">' + visited.length + '</div></div>'
+    +   '<div class="stat-card" style="border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Visits</div><div class="stat-card__value" style="color: var(--alert);">' + notVisited.length + '</div></div>'
+    +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Logs</div><div class="stat-card__value">' + myVisits.length + '</div></div>'
     + '</div>'
     + '<div class="panel">'
     +   '<div class="panel__head"><div class="eyebrow">Account Matrix</div><h3>' + esc(spLabel) + ' — Client Status</h3></div>'
@@ -635,10 +641,15 @@
     + '<div class="panel">'
     +   (rows.length===0
           ? '<div class="empty-state">No matching logs found.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Sales Person</th><th>Client Name</th><th>Discussion / Summary</th><th>Next Steps</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Sales Person</th><th>Client Name</th><th>Discussion / Summary</th><th>Next Steps</th><th>Last Visit</th><th>6-Month Status</th><th>Actions</th></tr></thead><tbody>'
             + rows.map(function(v){
+                const pVisits = visitsForParty(v.partyId);
+                const lastVisitDate = pVisits.length ? pVisits[0].date : null;
+                const pulseHtml = renderPulseBlocksForParty(v.partyId);
                 return '<tr><td class="nowrap">' + esc(dateLabel(v.date)) + '</td><td class="nowrap"><strong>' + esc(spName(v.spId)) + '</strong></td>'
                   + '<td class="nowrap"><strong>' + esc(partyName(v.partyId)) + '</strong></td><td>' + esc(v.discussion) + '</td><td>' + esc(v.outcome||'—') + '</td>'
+                  + '<td class="nowrap">' + (lastVisitDate ? esc(dateLabel(lastVisitDate)) : 'No Visits Yet') + '</td>'
+                  + '<td>' + pulseHtml + '</td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="edit-visit" data-id="' + v.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-visit" data-id="' + v.id + '">Delete</button></td></tr>';
               }).join('')
@@ -682,9 +693,10 @@
           : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Company Name</th><th>Area Location</th><th>Contact Details</th><th>Sales Person</th><th>Total Visits</th><th>Actions</th></tr></thead><tbody>'
             + sorted.map(function(p){
                 const vs = visitsForParty(p.id);
+                const assignedName = p.assignedSpId ? spName(p.assignedSpId) : '<span style="color:var(--hide); font-style:italic;">Unassigned</span>';
                 return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.location||'—') + '</td>'
                   + '<td>' + esc(p.contact||'—') + (p.phone?' <br><span style="color:var(--hide); font-size:12px;">'+esc(p.phone)+'</span>':'') + '</td>'
-                  + '<td><select data-action="assign-party" data-id="' + p.id + '" style="padding:4px 8px; font-size:13px; font-weight:600;">' + assignOptions(p.assignedSpId) + '</select></td>'
+                  + '<td><strong>' + assignedName + '</strong></td>'
                   + '<td><span class="badge badge--good" style="background:#EFF6FF; color:#1D4ED8; border:none;">' + vs.length + '</span></td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="view-party" data-id="' + p.id + '">History</button>'
                   + '<button class="link-btn" data-action="edit-party" data-id="' + p.id + '">Edit</button>'
@@ -903,7 +915,6 @@
       state.selectedFormSpId = e.target.value; 
       render(); 
     }
-    else if(e.target.dataset && e.target.dataset.action === 'assign-party'){ const pid = e.target.dataset.id; await savePartyCloud(pid, { assignedSpId: e.target.value }); }
   });
 
   document.addEventListener('input', function(e){ if(e.target.id === 'logSearch'){ state.logFilters.search = e.target.value; render(); } });
