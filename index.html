@@ -143,16 +143,8 @@
     padding: 24px; border: 1px solid var(--hide-light);
     position: relative; overflow: hidden; backdrop-filter: blur(2px);
   }
-  .stat-card::before {
-    content: ''; position: absolute; top:0; left:0; width: 4px; height: 100%;
-    background: var(--brand-orange);
-  }
-  .stat-card--alert::before { background: var(--alert); }
-  .stat-card--alert{ border-color: rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95); }
   .stat-card__label{ font-size: 12px; font-weight: 700; color: var(--brand-grey); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-card--alert .stat-card__label{ color: var(--alert); }
   .stat-card__value{ font-family: var(--font-display); font-size: 34px; font-weight: 700; color: #111827; }
-  .stat-card--alert .stat-card__value{ color: var(--alert); }
 
   .panel{
     background: rgba(255, 255, 255, 0.95); border: 1px solid var(--hide-light); border-radius: var(--radius);
@@ -211,7 +203,6 @@
   .table td{ padding: 14px; border-bottom: 1px solid var(--hide-light); vertical-align: middle; }
   .table tr:hover td { background-color: #F9FAFB; }
   .table tr.row--alert td{ background: rgba(254, 242, 242, 0.7); }
-  .table tr.row--alert td:first-child{ font-weight: 700; color: var(--alert); }
   
   .badge{ display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; }
   .badge--alert{ background: var(--alert-bg); color: var(--alert); border: 1px solid rgba(220,38,38,0.15); }
@@ -312,7 +303,7 @@
     selectedFormSpId: '',
     modal: null,
     logFilters: { sp:'all', party:'all', month:'all', search:'' },
-    showSuccessToast: false /* To show immediate inline confirmation toast */
+    showSuccessToast: false
   };
 
   function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -510,10 +501,10 @@
 
     return ''
     + '<div class="stat-grid">'
-    +   '<div class="stat-card"><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
-    +   '<div class="stat-card"><div class="stat-card__label">Visits This Month</div><div class="stat-card__value">' + visitsThisMonth + '</div></div>'
-    +   '<div class="stat-card"><div class="stat-card__label">Total Sales Team</div><div class="stat-card__value">' + teamSize + '</div></div>'
-    +   '<div class="stat-card stat-card--alert"><div class="stat-card__label">Pending Client Visits</div><div class="stat-card__value">' + totalNotVisitedAssigned + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visits This Month</div><div class="stat-card__value">' + visitsThisMonth + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Sales Team</div><div class="stat-card__value">' + teamSize + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Client Visits</div><div class="stat-card__value" style="color: var(--alert);">' + totalNotVisitedAssigned + '</div></div>'
     + '</div>'
 
     + '<div class="panel">'
@@ -525,7 +516,8 @@
                 return '<tr class="' + (r.notVisitedCount>0?'row--alert':'') + '">'
                   + '<td><strong>' + esc(r.sp.name) + '</strong></td><td>' + esc(r.sp.region||'—') + '</td>'
                   + '<td>' + r.assignedCount + '</td><td><span class="badge badge--good">' + r.visitedCount + '</span></td>'
-                  + '<td>' + (r.notVisitedCount > 0 ? '<span class="badge badge--alert">' + r.notVisitedCount + ' Pending</span>' : '0') + '</td>'
+                  // FIXED LOGIC: Removed the redundant "Pending" text inside the badge to keep only the pure number as requested
+                  + '<td>' + (r.notVisitedCount > 0 ? '<span class="badge badge--alert">' + r.notVisitedCount + '</span>' : '0') + '</td>'
                   + '<td><strong>' + (r.pct===null ? '—' : r.pct + '%') + '</strong></td></tr>';
               }).join('')
             + '</tbody></table></div>')
@@ -579,10 +571,10 @@
 
     return ''
     + '<div class="stat-grid">'
-    +   '<div class="stat-card"><div class="stat-card__label">Total Portfolio</div><div class="stat-card__value">' + assigned.length + '</div></div>'
-    +   '<div class="stat-card"><div class="stat-card__label">Visited This Month</div><div class="stat-card__value">' + visited.length + '</div></div>'
-    +   '<div class="stat-card stat-card--alert"><div class="stat-card__label">Pending Visits</div><div class="stat-card__value">' + notVisited.length + '</div></div>'
-    +   '<div class="stat-card"><div class="stat-card__label">Total Logs</div><div class="stat-card__value">' + myVisits.length + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Portfolio</div><div class="stat-card__value">' + assigned.length + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visited This Month</div><div class="stat-card__value">' + visited.length + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Visits</div><div class="stat-card__value" style="color: var(--alert);">' + notVisited.length + '</div></div>'
+    +   '<div class="stat-card" style="position: relative; overflow: hidden; backdrop-filter: blur(2px); border: 1px solid var(--hide-light);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Logs</div><div class="stat-card__value">' + myVisits.length + '</div></div>'
     + '</div>'
     + '<div class="panel">'
     +   '<div class="panel__head"><div class="eyebrow">Account Matrix</div><h3>' + esc(spLabel) + ' — Client Status</h3></div>'
@@ -638,7 +630,6 @@
     return ''
     + '<div class="view-head"><div><div class="eyebrow">Field Activity Portal</div><h2>' + (editing?'Update Visit Record':'Log Executed Field Visit') + '</h2></div></div>'
     + '<div class="panel panel--form">'
-    // DYNAMIC SUCCESS TOAST FOR MASS DATA ENTRY FEEDBACK
     + '<div class="alert-toast" id="successToast" style="' + (state.showSuccessToast ? 'display:block;' : 'display:none;') + '">✔ Entry Saved Successfully! Ready for next record.</div>'
     + (blocked
         ? '<div class="notice">Configuration incomplete: Please make sure both Sales Persons and Clients are added before logging a visit.</div>'
@@ -910,22 +901,19 @@
       const targetId = existingId ? existingId : uid('v');
       await saveVisitCloud(targetId, { spId:spId, partyId:partyId, date:date, discussion:discussion, outcome:outcome });
       
-      // FIXED LOGIC: If editing, go back to logs. If creating new, KEEP ON FORM for 100+ items mass entry!
       if (existingId) {
         state.editingVisitId = null;
         state.selectedFormSpId = '';
         state.tab = 'visitlog';
         render();
       } else {
-        state.selectedFormSpId = ''; // Reset selection for fresh input flow
-        state.showSuccessToast = true; // Show inline success feedback
+        state.selectedFormSpId = ''; 
+        state.showSuccessToast = true; 
         render();
         
-        // Auto-focus back onto the Sales Person Dropdown instantly
         const inputFocus = document.getElementById('vSp');
         if(inputFocus) inputFocus.focus();
         
-        // Clear success notification toast after 3 seconds dynamically
         setTimeout(function(){
           state.showSuccessToast = false;
           const toast = document.getElementById('successToast');
