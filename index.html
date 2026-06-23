@@ -207,6 +207,7 @@
   .badge{ display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; }
   .badge--alert{ background: var(--alert-bg); color: var(--alert); border: 1px solid rgba(220,38,38,0.15); }
   .badge--good{ background: var(--good-bg); color: var(--good); border: 1px solid rgba(22,163,74,0.15); }
+  .badge--neutral{ background: #EFF6FF; color: #1D4ED8; }
   
   .link-btn{
     background: none; border: none; cursor: pointer; color: var(--brand-orange);
@@ -308,7 +309,12 @@
   }
 
   function todayStr(){ return new Date().toISOString().slice(0,10); }
-  function currentMonthKey(){ return new Date().toISOString().slice(0,7); }
+  // Dynamically calculate months relative to June 2026
+  function getPastMonthKey(offset) {
+    const d = new Date(2026, 5, 1); // June 2026
+    d.setMonth(d.getMonth() - offset);
+    return d.toISOString().slice(0,7);
+  }
 
   function monthLabel(mk){
     if(!mk) return '';
@@ -329,7 +335,7 @@
   function daysSince(dateStr){
     if(!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
-    const now = new Date(); now.setHours(0,0,0,0);
+    const now = new Date(2026, 5, 23); // Standardized around June 23, 2026
     return Math.round((now - d) / 86400000);
   }
 
@@ -346,6 +352,9 @@
   }
   function visitsInMonthForParty(id, mk){
     return state.visits.filter(function(v){ return v.partyId===id && v.date.slice(0,7)===mk; });
+  }
+  function countPartyVisitsInMonth(partyId, mk){
+    return state.visits.filter(function(v){ return v.partyId===partyId && v.date.slice(0,7)===mk; }).length;
   }
   function totalVisitsInMonth(mk){
     return state.visits.filter(function(v){ return v.date.slice(0,7)===mk; }).length;
@@ -384,7 +393,7 @@
 
   function buildMonthOptionsForDashboard(selectedMk){
     const set = new Set(state.visits.map(function(v){ return v.date.slice(0,7); }));
-    set.add(currentMonthKey());
+    set.add(getPastMonthKey(0));
     set.add(selectedMk);
     const arr = Array.from(set).sort().reverse();
     return arr.map(function(mk){
@@ -417,7 +426,7 @@
   async function saveVisitCloud(id, data){ await db.collection("visits").doc(id).set(data, {merge: true}); }
 
   function renderDashboard(){
-    const mk = state.dashMonth || currentMonthKey();
+    const mk = state.dashMonth || getPastMonthKey(0);
     const spScope = state.dashSp || 'all';
 
     const spOptions = ['<option value="all"' + (spScope==='all'?' selected':'') + '>All Sales Persons</option>'].concat(
@@ -474,12 +483,45 @@
         return a.last.localeCompare(b.last);
       });
 
+    // Calculate dynamic pichle 3 mahine headings
+    const m0 = getPastMonthKey(0); // June 2026
+    const m1 = getPastMonthKey(1); // May 2026
+    const m2 = getPastMonthKey(2); // April 2026
+
+    const sortedParties = state.parties.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+
     return ''
     + '<div class="stat-grid">'
     +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Visits</div><div class="stat-card__value">' + totalVisits + '</div></div>'
     +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Visits This Month</div><div class="stat-card__value">' + visitsThisMonth + '</div></div>'
     +   '<div class="stat-card"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--brand-orange);"></div><div class="stat-card__label">Total Sales Team</div><div class="stat-card__value">' + teamSize + '</div></div>'
     +   '<div class="stat-card" style="border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Client Visits</div><div class="stat-card__value" style="color: var(--alert);">' + totalNotVisitedAssigned + '</div></div>'
+    + '</div>'
+
+    /* BRAND NEW 3-MONTH PARTY FREQUENCY REPORT */
+    + '<div class="panel">'
+    +   '<div class="panel__head"><div class="eyebrow">Frequency Tracker</div><h3>Client Visit Report (Last 3 Months)</h3></div>'
+    +   (sortedParties.length === 0
+          ? '<div class="empty-state">No clients registered.</div>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Party Name</th><th>Assigned Sales Person</th><th>' + esc(monthLabel(m2)) + '</th><th>' + esc(monthLabel(m1)) + '</th><th>' + esc(monthLabel(m0)) + '</th><th>Total (3m)</th></tr></thead><tbody>'
+            + sortedParties.map(function(p){
+                const c0 = countPartyVisitsInMonth(p.id, m0);
+                const c1 = countPartyVisitsInMonth(p.id, m1);
+                const c2 = countPartyVisitsInMonth(p.id, m2);
+                const total3m = c0 + c1 + c2;
+                const assignedSp = state.salespeople.find(function(s){ return s.id === p.assignedSpId; });
+                const spDisp = assignedSp ? esc(assignedSp.name) : '<span style="color:var(--hide); font-style:italic;">Unassigned</span>';
+                
+                return '<tr>'
+                  + '<td><strong>' + esc(p.name) + '</strong></td>'
+                  + '<td>' + spDisp + '</td>'
+                  + '<td><span class="badge ' + (c2>0?'badge--good':'badge--alert') + '">' + c2 + ' visits</span></td>'
+                  + '<td><span class="badge ' + (c1>0?'badge--good':'badge--alert') + '">' + c1 + ' visits</span></td>'
+                  + '<td><span class="badge ' + (c0>0?'badge--good':'badge--alert') + '">' + c0 + ' visits</span></td>'
+                  + '<td><span class="badge badge--neutral"><strong>' + total3m + ' Total</strong></span></td>'
+                  + '</tr>';
+              }).join('')
+            + '</tbody></table></div>')
     + '</div>'
 
     + '<div class="panel">'
@@ -920,7 +962,7 @@
   document.addEventListener('input', function(e){ if(e.target.id === 'logSearch'){ state.logFilters.search = e.target.value; render(); } });
   document.getElementById('resetDataBtn').addEventListener('click', resetAllData);
 
-  function init(){ state.dashMonth = currentMonthKey(); setupCloudSync(); }
+  function init(){ state.dashMonth = getPastMonthKey(0); setupCloudSync(); }
   init();
 })();
 </script>
