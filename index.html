@@ -205,7 +205,8 @@
   .table tr.row--alert td{ background: rgba(254, 242, 242, 0.7); }
   
   .badge{ display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-  .badge--alert{ background: var(--alert-bg); color: var(--alert); border: 1px solid rgba(220,38,38,0.15); }
+  .badge--alert{ background: var(--alert-bg); color: var(--alert); border: 1px solid rgba(220,38,38,0.15); cursor: pointer; }
+  .badge--alert:hover{ filter: brightness(0.95); }
   .badge--good{ background: var(--good-bg); color: var(--good); border: 1px solid rgba(22,163,74,0.15); }
   .badge--neutral{ background: #EFF6FF; color: #1D4ED8; }
   
@@ -220,10 +221,6 @@
   .filter-bar{ display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: var(--radius); border: 1px solid var(--hide-light); }
   .filter-bar input{ flex: 2; min-width: 250px; }
   .filter-bar select{ flex: 1; min-width: 180px; }
-
-  .pulse{ display: flex; gap: 5px; align-items: center; }
-  .pulse__cell{ width: 12px; height: 12px; border-radius: 2px; background: #E5E7EB; border: 1px solid #D1D5DB; }
-  .pulse__cell--filled{ background: var(--brand-orange); border-color: #EA580C; }
 
   .empty-state{ color: var(--hide); font-size: 14px; padding: 32px 0; text-align: center; font-style: italic; }
   .loading-state{ color: var(--brand-orange); font-size: 16px; font-weight: 600; padding: 80px 0; text-align: center; font-family: var(--font-display); }
@@ -291,12 +288,13 @@
     visits: [],
     dashMonth: null,
     dashSp: 'all',
+    pendingFilterSpId: 'all', // Dynamic Tracker for interactive filter click
     editingVisitId: null,
     editingPartyId: null,
     editingSpId: null,
     selectedFormSpId: '',
     modal: null,
-    logFilters: { sp:'all', party:'all', month:'all', search:'' },
+    logFilters: { sp:'all', party:'all', timeframe:'all', search:'' },
     showSuccessToast: false
   };
 
@@ -309,9 +307,9 @@
   }
 
   function todayStr(){ return new Date().toISOString().slice(0,10); }
-  // Dynamically calculate months relative to June 2026
+  
   function getPastMonthKey(offset) {
-    const d = new Date(2026, 5, 1); // June 2026
+    const d = new Date(2026, 5, 1); 
     d.setMonth(d.getMonth() - offset);
     return d.toISOString().slice(0,7);
   }
@@ -335,7 +333,7 @@
   function daysSince(dateStr){
     if(!dateStr) return null;
     const d = new Date(dateStr + 'T00:00:00');
-    const now = new Date(2026, 5, 23); // Standardized around June 23, 2026
+    const now = new Date(2026, 5, 23); 
     return Math.round((now - d) / 86400000);
   }
 
@@ -353,9 +351,6 @@
   function visitsInMonthForParty(id, mk){
     return state.visits.filter(function(v){ return v.partyId===id && v.date.slice(0,7)===mk; });
   }
-  function countPartyVisitsInMonth(partyId, mk){
-    return state.visits.filter(function(v){ return v.partyId===partyId && v.date.slice(0,7)===mk; }).length;
-  }
   function totalVisitsInMonth(mk){
     return state.visits.filter(function(v){ return v.date.slice(0,7)===mk; }).length;
   }
@@ -370,26 +365,6 @@
   function visitedInMonthBySp(spId, partyId, mk){
     return state.visits.some(function(v){ return v.spId===spId && v.partyId===partyId && v.date.slice(0,7)===mk; });
   }
-  
-  function lastVisitByForParty(spId, partyId){
-    const vs = state.visits.filter(function(v){ return v.spId===spId && v.partyId===partyId; })
-      .sort(function(a,b){ return b.date.localeCompare(a.date); });
-    return vs.length ? vs[0].date : null;
-  }
-
-  function renderPulseBlocksForParty(partyId) {
-    const vs = visitsForParty(partyId);
-    let html = '<div class="pulse">';
-    for(let i=0; i<5; i++) {
-      if (i < vs.length) {
-        html += '<div class="pulse__cell pulse__cell--filled"></div>';
-      } else {
-        html += '<div class="pulse__cell"></div>';
-      }
-    }
-    html += '</div>';
-    return html;
-  }
 
   function buildMonthOptionsForDashboard(selectedMk){
     const set = new Set(state.visits.map(function(v){ return v.date.slice(0,7); }));
@@ -399,6 +374,30 @@
     return arr.map(function(mk){
       return '<option value="' + mk + '"' + (mk===selectedMk?' selected':'') + '>' + esc(monthLabel(mk)) + '</option>';
     }).join('');
+  }
+
+  // Live Check for Timeframes (This Week, Month, Quarter, Year) based on 2026 anchor point
+  function matchesTimeframe(dateStr, timeframe) {
+    if (timeframe === 'all') return true;
+    const itemDate = new Date(dateStr + 'T00:00:00');
+    const anchorDate = new Date(2026, 5, 23); // Standard June 23, 2026 target
+    
+    if (timeframe === 'week') {
+      const diffTime = Math.abs(anchorDate - itemDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 7;
+    }
+    if (timeframe === 'month') {
+      return itemDate.getFullYear() === 2026 && itemDate.getMonth() === 5; // June 2026
+    }
+    if (timeframe === 'quarter') {
+      const m = itemDate.getMonth();
+      return itemDate.getFullYear() === 2026 && (m >= 3 && m <= 5); // Q2 2026 (Apr, May, June)
+    }
+    if (timeframe === 'year') {
+      return itemDate.getFullYear() === 2026;
+    }
+    return true;
   }
 
   function setupCloudSync(){
@@ -468,27 +467,26 @@
     const totalNotVisitedAssigned = coverageRows.reduce(function(sum,r){ return sum + r.notVisitedCount; }, 0);
     const unassigned = unassignedParties();
 
-    const notVisitedAll = state.parties
+    // Filtering Overdue action based on interactive matrix click trail
+    let notVisitedAll = state.parties
       .map(function(p){
         const vs = visitsForParty(p.id);
         const last = vs.length ? vs[0].date : null;
         const inMonth = visitsInMonthForParty(p.id, mk).length;
         const assignedSp = state.salespeople.find(function(s){ return s.id === p.assignedSpId; });
-        return { id:p.id, name:p.name, location:p.location, last:last, inMonth:inMonth, assignedName: assignedSp ? assignedSp.name : null };
+        return { id:p.id, name:p.name, location:p.location, last:last, inMonth:inMonth, assignedSpId: p.assignedSpId, assignedName: assignedSp ? assignedSp.name : null };
       })
-      .filter(function(p){ return p.inMonth === 0; })
-      .sort(function(a,b){
-        if(!a.last && !b.last) return a.name.localeCompare(b.name);
-        if(!a.last) return -1; if(!b.last) return 1;
-        return a.last.localeCompare(b.last);
-      });
+      .filter(function(p){ return p.inMonth === 0; });
 
-    // Calculate dynamic pichle 3 mahine headings
-    const m0 = getPastMonthKey(0); // June 2026
-    const m1 = getPastMonthKey(1); // May 2026
-    const m2 = getPastMonthKey(2); // April 2026
+    if (state.pendingFilterSpId !== 'all') {
+      notVisitedAll = notVisitedAll.filter(function(p) { return p.assignedSpId === state.pendingFilterSpId; });
+    }
 
-    const sortedParties = state.parties.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+    notVisitedAll.sort(function(a,b){
+      if(!a.last && !b.last) return a.name.localeCompare(b.name);
+      if(!a.last) return -1; if(!b.last) return 1;
+      return a.last.localeCompare(b.last);
+    });
 
     return ''
     + '<div class="stat-grid">'
@@ -498,51 +496,28 @@
     +   '<div class="stat-card" style="border: 1px solid rgba(220, 38, 38, 0.15); background: rgba(254, 242, 242, 0.95);"><div style="position: absolute; top:0; left:0; width: 4px; height: 100%; background: var(--alert);"></div><div class="stat-card__label" style="color: var(--alert);">Pending Client Visits</div><div class="stat-card__value" style="color: var(--alert);">' + totalNotVisitedAssigned + '</div></div>'
     + '</div>'
 
-    /* BRAND NEW 3-MONTH PARTY FREQUENCY REPORT */
-    + '<div class="panel">'
-    +   '<div class="panel__head"><div class="eyebrow">Frequency Tracker</div><h3>Client Visit Report (Last 3 Months)</h3></div>'
-    +   (sortedParties.length === 0
-          ? '<div class="empty-state">No clients registered.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Party Name</th><th>Assigned Sales Person</th><th>' + esc(monthLabel(m2)) + '</th><th>' + esc(monthLabel(m1)) + '</th><th>' + esc(monthLabel(m0)) + '</th><th>Total (3m)</th></tr></thead><tbody>'
-            + sortedParties.map(function(p){
-                const c0 = countPartyVisitsInMonth(p.id, m0);
-                const c1 = countPartyVisitsInMonth(p.id, m1);
-                const c2 = countPartyVisitsInMonth(p.id, m2);
-                const total3m = c0 + c1 + c2;
-                const assignedSp = state.salespeople.find(function(s){ return s.id === p.assignedSpId; });
-                const spDisp = assignedSp ? esc(assignedSp.name) : '<span style="color:var(--hide); font-style:italic;">Unassigned</span>';
-                
-                return '<tr>'
-                  + '<td><strong>' + esc(p.name) + '</strong></td>'
-                  + '<td>' + spDisp + '</td>'
-                  + '<td><span class="badge ' + (c2>0?'badge--good':'badge--alert') + '">' + c2 + ' visits</span></td>'
-                  + '<td><span class="badge ' + (c1>0?'badge--good':'badge--alert') + '">' + c1 + ' visits</span></td>'
-                  + '<td><span class="badge ' + (c0>0?'badge--good':'badge--alert') + '">' + c0 + ' visits</span></td>'
-                  + '<td><span class="badge badge--neutral"><strong>' + total3m + ' Total</strong></span></td>'
-                  + '</tr>';
-              }).join('')
-            + '</tbody></table></div>')
-    + '</div>'
-
     + '<div class="panel">'
     +   '<div class="panel__head"><div class="eyebrow">Performance Matrix</div><h3>Coverage Summary — ' + esc(monthLabel(mk)) + '</h3></div>'
     +   (coverageRows.length === 0
           ? '<div class="empty-state">No sales persons found. Please add them in Sales Team tab.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person</th><th>Area</th><th>Assigned Clients</th><th>Visited</th><th>Pending</th><th>Coverage Profile</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person</th><th>Area</th><th>Assigned Clients</th><th>Visited</th><th>Pending (Click to Filter)</th><th>Coverage Profile</th></tr></thead><tbody>'
             + coverageRows.map(function(r){
-                return '<tr class="' + (r.notVisitedCount>0?'row--alert':'') + '">'
+                const isSelected = state.pendingFilterSpId === r.sp.id;
+                const highlightStyle = isSelected ? 'style="border: 2px solid var(--alert); font-weight:bold;"' : '';
+                return '<tr>'
                   + '<td><strong>' + esc(r.sp.name) + '</strong></td><td>' + esc(r.sp.region||'—') + '</td>'
                   + '<td>' + r.assignedCount + '</td><td><span class="badge badge--good">' + r.visitedCount + '</span></td>'
-                  + '<td>' + (r.notVisitedCount > 0 ? '<span class="badge badge--alert">' + r.notVisitedCount + '</span>' : '0') + '</td>'
+                  + '<td>' + (r.notVisitedCount > 0 ? '<span class="badge badge--alert" data-action="filter-pending" data-spid="' + r.sp.id + '" ' + highlightStyle + '>' + r.notVisitedCount + ' Pending</span>' : '0') + '</td>'
                   + '<td><strong>' + (r.pct===null ? '—' : r.pct + '%') + '</strong></td></tr>';
               }).join('')
             + '</tbody></table></div>')
     + '</div>'
 
     + '<div class="panel">'
-    +   '<div class="panel__head"><div class="eyebrow">Alerts</div><h3>Overdue Action (No visit this month)</h3></div>'
+    +   '<div class="panel__head"><div class="eyebrow">Alerts</div><h3>Overdue Action ' + (state.pendingFilterSpId !== 'all' ? '(Filtered for ' + esc(spName(state.pendingFilterSpId)) + ')' : '(No visit this month)') + '</h3>'
+    +   (state.pendingFilterSpId !== 'all' ? '<button class="link-btn" data-action="clear-pending-filter" style="float:right; margin-top:-25px;">Clear Filter / Show All</button>' : '') + '</div>'
     +   (notVisitedAll.length === 0
-          ? '<div class="empty-state">All clients successfully visited this month.</div>'
+          ? '<div class="empty-state">No pending clients found for this selection.</div>'
           : '<div class="table-wrap"><table class="table"><thead><tr><th>Client Name</th><th>Assigned Sales Person</th><th>Location</th><th>Last Visit</th><th>Days Dormant</th></tr></thead><tbody>'
             + notVisitedAll.map(function(p){
                 return '<tr class="row--alert"><td><strong>' + esc(p.name) + '</strong></td>'
@@ -568,7 +543,7 @@
     const assigned = partiesAssignedTo(spId).slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
     
     const coverage = assigned.map(function(p){
-      return { id:p.id, name:p.name, location:p.location, lastVisit:lastVisitByForParty(spId, p.id), visitedThisMonth:visitedInMonthBySp(spId, p.id, mk) };
+      return { id:p.id, name:p.name, location:p.location, lastVisit:state.visits.filter(v => v.spId===spId && v.partyId===p.id).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date || null, visitedThisMonth:visitedInMonthBySp(spId, p.id, mk) };
     });
 
     const notVisited = coverage.filter(function(c){ return !c.visitedThisMonth; });
@@ -602,19 +577,14 @@
 
   function renderAddVisit(){
     const editing = state.editingVisitId ? state.visits.find(function(v){ return v.id===state.editingVisitId; }) : null;
-    
-    if (editing && !state.selectedFormSpId) {
-      state.selectedFormSpId = editing.spId;
-    }
+    if (editing && !state.selectedFormSpId) { state.selectedFormSpId = editing.spId; }
 
     const spOptions = state.salespeople.map(function(s){ 
       return '<option value="' + s.id + '"' + (state.selectedFormSpId===s.id ? ' selected':'') + '>' + esc(s.name) + '</option>'; 
     }).join('');
 
     let filteredParties = [];
-    if (state.selectedFormSpId) {
-      filteredParties = state.parties.filter(function(p) { return p.assignedSpId === state.selectedFormSpId; });
-    }
+    if (state.selectedFormSpId) { filteredParties = state.parties.filter(function(p) { return p.assignedSpId === state.selectedFormSpId; }); }
 
     let partyOptions = '';
     if (!state.selectedFormSpId) {
@@ -633,7 +603,7 @@
     return ''
     + '<div class="view-head"><div><div class="eyebrow">Field Activity Portal</div><h2>' + (editing?'Update Visit Record':'Log Executed Field Visit') + '</h2></div></div>'
     + '<div class="panel panel--form">'
-    + '<div class="alert-toast" id="successToast" style="' + (state.showSuccessToast ? 'display:block;' : 'display:none;') + '">✔ Entry Saved Successfully! Ready for next record.</div>'
+    + '<div class="alert-toast" id="successToast" style="' + (state.showSuccessToast ? 'display:block;' : 'display:none;') + '">✔ Entry Saved Successfully!</div>'
     + (blocked
         ? '<div class="notice">Configuration incomplete: Please make sure both Sales Persons and Clients are added before logging a visit.</div>'
         : '<form id="visitForm">'
@@ -646,9 +616,9 @@
           +   '<div class="form-field"><label for="vDate">Visit Date</label><input type="date" id="vDate" required value="' + (editing?editing.date:todayStr()) + '"></div>'
           + '</div>'
           + '<div class="form-field"><label for="vDiscussion">Meeting Notes / Discussion</label>'
-          +   '<textarea id="vDiscussion" rows="4" required placeholder="What was discussed during the meeting? (e.g., Orders booked, stock levels checked, payment collections)...">' + (editing?esc(editing.discussion):'') + '</textarea></div>'
-          + '<div class="form-field"><label for="vOutcome">Next Steps / Follow-up Tasks <span class="optional">(Optional)</span></label>'
-          +   '<textarea id="vOutcome" rows="2" placeholder="Any specific tasks or follow-up action plan required...">' + (editing?esc(editing.outcome||''):'') + '</textarea></div>'
+          +   '<textarea id="vDiscussion" rows="4" required>' + (editing?esc(editing.discussion):'') + '</textarea></div>'
+          + '<div class="form-field"><label for="vOutcome">Next Steps / Follow-up Tasks</label>'
+          +   '<textarea id="vOutcome" rows="2">' + (editing?esc(editing.outcome||''):'') + '</textarea></div>'
           + '<input type="hidden" id="vId" value="' + (editing?editing.id:'') + '">'
           + '<div class="form-actions"><button type="submit" class="btn">' + (editing?'Save Changes':'Submit Visit Log') + '</button>'
           +   (editing? '<button type="button" class="btn btn--ghost" data-action="cancel-edit-visit">Cancel</button>' : '')
@@ -660,13 +630,19 @@
   function renderVisitLog(){
     const f = state.logFilters;
     let rows = state.visits.slice();
+    
     if(f.sp !== 'all') rows = rows.filter(function(v){ return v.spId===f.sp; });
     if(f.party !== 'all') rows = rows.filter(function(v){ return v.partyId===f.party; });
-    if(f.month !== 'all') rows = rows.filter(function(v){ return v.date.slice(0,7)===f.month; });
+    
+    // Timeframe filtering (This Week, This Month, This Quarter, This Year)
+    if(f.timeframe !== 'all') {
+      rows = rows.filter(function(v){ return matchesTimeframe(v.date, f.timeframe); });
+    }
+
     if(f.search){
       const q = f.search.toLowerCase();
       rows = rows.filter(function(v){
-        return (v.discussion||'').toLowerCase().indexOf(q)>-1 || (v.outcome||'').toLowerCase().indexOf(q)>-1 || spName(v.spId).toLowerCase().indexOf(q)>-1 || partyName(v.partyId).toLowerCase().indexOf(q)>-1;
+        return (v.discussion||'').toLowerCase().indexOf(q)>-1 || (v.outcome||'').toLowerCase().indexOf(q)>-1 || partyName(v.partyId).toLowerCase().indexOf(q)>-1;
       });
     }
     rows.sort(function(a,b){ return b.date.localeCompare(a.date); });
@@ -678,20 +654,26 @@
     +   '<input type="text" id="logSearch" placeholder="Search comments, discussion text or keywords..." value="' + esc(f.search) + '">'
     +   '<select id="logSpFilter">' + ['<option value="all">All Sales Persons</option>'].concat(state.salespeople.map(function(s){ return '<option value="' + s.id + '"' + (f.sp===s.id?' selected':'') + '>' + esc(s.name) + '</option>'; })).join('') + '</select>'
     +   '<select id="logPartyFilter">' + ['<option value="all">All Clients</option>'].concat(state.parties.map(function(p){ return '<option value="' + p.id + '"' + (f.party===p.id?' selected':'') + '>' + esc(p.name) + '</option>'; })).join('') + '</select>'
-    +   '<select id="logMonthFilter">' + ['<option value="all">All History</option>'].concat(Array.from(new Set(state.visits.map(function(v){ return v.date.slice(0,7); }))).sort().reverse().map(function(mk){ return '<option value="' + mk + '"' + (f.month===mk?' selected':'') + '>' + esc(monthLabel(mk)) + '</option>'; })).join('') + '</select>'
+    +   '<select id="logTimeframeFilter">' 
+    +     '<option value="all" ' + (f.timeframe==='all'?'selected':'') + '>All History</option>'
+    +     '<option value="week" ' + (f.timeframe==='week'?'selected':'') + '>This Week</option>'
+    +     '<option value="month" ' + (f.timeframe==='month'?'selected':'') + '>This Month</option>'
+    +     '<option value="quarter" ' + (f.timeframe==='quarter'?'selected':'') + '>This Quarter</option>'
+    +     '<option value="year" ' + (f.timeframe==='year'?'selected':'') + '>This Year</option>'
+    +   '</select>'
     + '</div>'
     + '<div class="panel">'
     +   (rows.length===0
           ? '<div class="empty-state">No matching logs found.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Sales Person</th><th>Client Name</th><th>Discussion / Summary</th><th>Next Steps</th><th>Last Visit</th><th>6-Month Status</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Client Name</th><th>Discussion / Summary</th><th>Next Steps</th><th>Last Visit</th><th>No of Visit</th><th>Actions</th></tr></thead><tbody>'
             + rows.map(function(v){
-                const pVisits = visitsForParty(v.partyId);
-                const lastVisitDate = pVisits.length ? pVisits[0].date : null;
-                const pulseHtml = renderPulseBlocksForParty(v.partyId);
-                return '<tr><td class="nowrap">' + esc(dateLabel(v.date)) + '</td><td class="nowrap"><strong>' + esc(spName(v.spId)) + '</strong></td>'
+                const pVisits = state.visits.filter(function(x){ return x.partyId === v.partyId; });
+                const lastVisitDate = pVisits.length ? pVisits.sort((a,b)=>b.date.localeCompare(a.date))[0].date : null;
+                const totalVisitsCount = pVisits.length;
+                return '<tr><td class="nowrap">' + esc(dateLabel(v.date)) + '</td>'
                   + '<td class="nowrap"><strong>' + esc(partyName(v.partyId)) + '</strong></td><td>' + esc(v.discussion) + '</td><td>' + esc(v.outcome||'—') + '</td>'
                   + '<td class="nowrap">' + (lastVisitDate ? esc(dateLabel(lastVisitDate)) : 'No Visits Yet') + '</td>'
-                  + '<td>' + pulseHtml + '</td>'
+                  + '<td><span class="badge badge--neutral"><strong>' + totalVisitsCount + ' visits</strong></span></td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="edit-visit" data-id="' + v.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-visit" data-id="' + v.id + '">Delete</button></td></tr>';
               }).join('')
@@ -704,24 +686,15 @@
     const sorted = state.parties.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
     const spChoices = state.salespeople.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
 
-    function assignOptions(selectedId){
-      return '<option value=""' + (!selectedId?' selected':'') + '>Select Sales Person (Unassigned)</option>'
-        + spChoices.map(function(s){ return '<option value="' + s.id + '"' + (selectedId===s.id?' selected':'') + '>' + esc(s.name) + '</option>'; }).join('');
-    }
-
     return ''
     + '<div class="view-head"><div><div class="eyebrow">Parties Manager</div><h2>Client Profiles & Accounts</h2></div></div>'
     + '<div class="panel panel--form">'
     +   '<h3 class="panel__subhead">' + (editing?'Edit Client Profile':'Add New Client / Party') + '</h3>'
     +   '<form id="partyForm">'
     +     '<div class="form-row">'
-    +       '<div class="form-field"><label for="pName">Client / Company Name</label><input type="text" id="pName" required value="' + (editing?esc(editing.name):'') + '" placeholder="e.g., Sharma Steel Traders"></div>'
-    +       '<div class="form-field"><label for="pLocation">City / Market Area</label><input type="text" id="pLocation" value="' + (editing?esc(editing.location||''):'') + '" placeholder="e.g., Surat Textile Market"></div>'
-    +       '<div class="form-field"><label for="pAssignedSp">Assign Sales Person</label><select id="pAssignedSp">' + assignOptions(editing?editing.assignedSpId:'') + '</select></div>'
-    +     '</div>'
-    +     '<div class="form-row">'
-    +       '<div class="form-field"><label for="pContact">Contact Person Name</label><input type="text" id="pContact" value="' + (editing?esc(editing.contact||''):'') + '" placeholder="e.g., Rajesh Bhai"></div>'
-    +       '<div class="form-field"><label for="pPhone">Mobile Number</label><input type="text" id="pPhone" value="' + (editing?esc(editing.phone||''):'') + '" placeholder="e.g., 9876543210"></div>'
+    +       '<div class="form-field"><label for="pName">Client / Company Name</label><input type="text" id="pName" required value="' + (editing?esc(editing.name):'') + '"></div>'
+    +       '<div class="form-field"><label for="pLocation">City / Market Area</label><input type="text" id="pLocation" value="' + (editing?esc(editing.location||''):'') + '"></div>'
+    +       '<div class="form-field"><label for="pAssignedSp">Assign Sales Person</label><select id="pAssignedSp">' + '<option value="">Select Sales Person</option>' + spChoices.map(function(s){ return '<option value="' + s.id + '"' + (editing&&editing.assignedSpId===s.id?' selected':'') + '>' + esc(s.name) + '</option>'; }).join('') + '</select></div>'
     +     '</div>'
     +     '<input type="hidden" id="pId" value="' + (editing?editing.id:'') + '">'
     +     '<div class="form-actions"><button type="submit" class="btn">' + (editing?'Save Changes':'Save Client Profile') + '</button>'
@@ -732,14 +705,11 @@
     + '<div class="panel">'
     +   (sorted.length===0
           ? '<div class="empty-state">No clients registered yet.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Company Name</th><th>Area Location</th><th>Contact Details</th><th>Sales Person</th><th>Total Visits</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Client / Company Name</th><th>Area Location</th><th>Sales Person</th><th>Actions</th></tr></thead><tbody>'
             + sorted.map(function(p){
-                const vs = visitsForParty(p.id);
-                const assignedName = p.assignedSpId ? spName(p.assignedSpId) : '<span style="color:var(--hide); font-style:italic;">Unassigned</span>';
+                const assignedName = p.assignedSpId ? spName(p.assignedSpId) : 'Unassigned';
                 return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.location||'—') + '</td>'
-                  + '<td>' + esc(p.contact||'—') + (p.phone?' <br><span style="color:var(--hide); font-size:12px;">'+esc(p.phone)+'</span>':'') + '</td>'
                   + '<td><strong>' + assignedName + '</strong></td>'
-                  + '<td><span class="badge badge--good" style="background:#EFF6FF; color:#1D4ED8; border:none;">' + vs.length + '</span></td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="view-party" data-id="' + p.id + '">History</button>'
                   + '<button class="link-btn" data-action="edit-party" data-id="' + p.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-party" data-id="' + p.id + '">Delete</button></td></tr>';
@@ -755,11 +725,11 @@
     return ''
     + '<div class="view-head"><div><div class="eyebrow">Team Management</div><h2>Active Sales Team Roster</h2></div></div>'
     + '<div class="panel panel--form">'
-    +   '<h3 class="panel__subhead">' + (editing?'Edit Sales Person details':'Add New Sales Person') + '</h3>'
+    +   '<h3 class="panel__subhead">' + (editing?'Edit Sales Person':'Add New Sales Person') + '</h3>'
     +   '<form id="spForm">'
     +     '<div class="form-row">'
-    +       '<div class="form-field"><label for="sName">Full Name</label><input type="text" id="sName" required value="' + (editing?esc(editing.name):'') + '" placeholder="e.g., Amit Kumar"></div>'
-    +       '<div class="form-field"><label for="sRegion">Assigned City / Region</label><input type="text" id="sRegion" value="' + (editing?esc(editing.region||''):'') + '" placeholder="e.g., Delhi NCR"></div>'
+    +       '<div class="form-field"><label for="sName">Full Name</label><input type="text" id="sName" required value="' + (editing?esc(editing.name):'') + '"></div>'
+    +       '<div class="form-field"><label for="sRegion">Assigned Region</label><input type="text" id="sRegion" value="' + (editing?esc(editing.region||''):'') + '"></div>'
     +     '</div>'
     +     '<input type="hidden" id="sId" value="' + (editing?editing.id:'') + '">'
     +     '<div class="form-actions"><button type="submit" class="btn">' + (editing?'Save Changes':'Add Sales Person') + '</button>'
@@ -770,13 +740,9 @@
     + '<div class="panel">'
     +   (sorted.length===0
           ? '<div class="empty-state">No sales team members found.</div>'
-          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person Name</th><th>Region Location</th><th>Assigned Clients</th><th>Last Active Date</th><th>Actions</th></tr></thead><tbody>'
+          : '<div class="table-wrap"><table class="table"><thead><tr><th>Sales Person Name</th><th>Region Location</th><th>Actions</th></tr></thead><tbody>'
             + sorted.map(function(s){
-                const vs = visitsForSp(s.id);
-                const last = vs.length ? vs[0].date : null; const assignedCount = partiesAssignedTo(s.id).length;
                 return '<tr><td><strong>' + esc(s.name) + '</strong></td><td>' + esc(s.region||'—') + '</td>'
-                  + '<td><strong>' + assignedCount + ' clients</strong></td>'
-                  + '<td>' + (last?esc(dateLabel(last)):'In-Active') + '</td>'
                   + '<td class="nowrap actions-cell"><button class="link-btn" data-action="view-sp" data-id="' + s.id + '">Logs Trail</button>'
                   + '<button class="link-btn" data-action="edit-sp" data-id="' + s.id + '">Edit</button>'
                   + '<button class="link-btn link-btn--danger" data-action="delete-sp" data-id="' + s.id + '">Remove</button></td></tr>';
@@ -800,12 +766,9 @@
     +       (vs.length===0
             ? '<div class="empty-state">No visit history logs recorded.</div>'
             : vs.map(function(v){
-                return '<div class="activity-item" style="margin-bottom:12px;"><div class="activity-item__date">' + esc(dateLabel(v.date)) + '</div>'
-                  + '<div class="activity-item__body"><div class="activity-item__title"><strong>'
-                  + (m.type==='party' ? esc(spName(v.spId)) : esc(partyName(v.partyId)))
-                  + '</strong></div><div class="activity-item__note">“' + esc(v.discussion) + '”</div>'
-                  + (v.outcome ? '<div style="color:var(--brand-orange); font-size:13px; font-weight:600; margin-top:4px;">Next Step: ' + esc(v.outcome) + '</div>' : '')
-                  + '</div></div>';
+                return '<div style="margin-bottom:12px; border-bottom:1px solid var(--hide-light); padding-bottom:8px;">'
+                  + '<strong>' + esc(dateLabel(v.date)) + '</strong> — <em>' + esc(v.discussion) + '</em>'
+                  + '</div>';
               }).join(''))
     +     '</div>'
     +   '</div>'
@@ -813,10 +776,6 @@
   }
 
   function render(){
-    const active = document.activeElement; const activeId = active && active.id;
-    const selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
-    const selEnd = active && typeof active.selectionEnd === 'number' ? active.selectionEnd : null;
-
     const app = document.getElementById('app'); let html = '';
     if(state.tab === 'dashboard') html = renderDashboard();
     else if(state.tab === 'addvisit') html = renderAddVisit();
@@ -826,76 +785,44 @@
 
     if(app) app.innerHTML = html + renderModal();
     document.querySelectorAll('.tab').forEach(function(btn){ btn.classList.toggle('active', btn.dataset.tab === state.tab); });
-
-    if(activeId){
-      const el = document.getElementById(activeId);
-      if(el){ el.focus(); if(selStart !== null && el.setSelectionRange){ try{ el.setSelectionRange(selStart, selEnd); }catch(e){} } }
-    }
-  }
-
-  function exportCsv(){
-    const f = state.logFilters; let rows = state.visits.slice();
-    if(f.sp !== 'all') rows = rows.filter(function(v){ return v.spId===f.sp; });
-    if(f.party !== 'all') rows = rows.filter(function(v){ return v.partyId===f.party; });
-    if(f.month !== 'all') rows = rows.filter(function(v){ return v.date.slice(0,7)===f.month; });
-    if(f.search){
-      const q = f.search.toLowerCase();
-      rows = rows.filter(function(v){
-        return (v.discussion||'').toLowerCase().indexOf(q)>-1 || (v.outcome||'').toLowerCase().indexOf(q)>-1 || spName(v.spId).toLowerCase().indexOf(q)>-1 || partyName(v.partyId).toLowerCase().indexOf(q)>-1;
-      });
-    }
-    rows.sort(function(a,b){ return b.date.localeCompare(a.date); });
-
-    const header = ['Date','Sales Person','Client Name','Discussion Notes','Next Steps'];
-    const csvRows = [header.join(',')];
-    rows.forEach(function(v){
-      const cells = [v.date, spName(v.spId), partyName(v.partyId), v.discussion||'', v.outcome||''];
-      csvRows.push(cells.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','));
-    });
-    const csv = csvRows.join('\n'); const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-    const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = 'rhino-lux-visit-reports.csv'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
   async function resetAllData(){
-    if(!confirm('This will delete all logs across devices. Reset everything?')) return;
-    if(!confirm('Are you absolutely sure? This action cannot be reversed.')) return;
+    if(!confirm('Reset everything? This action cannot be reversed.')) return;
     const tables = ['salespeople', 'parties', 'visits'];
     for(let table of tables){ const snap = await db.collection(table).get(); snap.forEach(function(doc) { doc.ref.delete(); }); }
-    state.salespeople = []; state.parties = []; state.visits = [];
-    state.editingVisitId = null; state.editingPartyId = null; state.editingSpId = null; state.modal = null; state.selectedFormSpId = '';
-    state.tab = 'dashboard'; render();
+    state.salespeople = []; state.parties = []; state.visits = []; render();
   }
 
   document.addEventListener('click', async function(e){
     const tabBtn = e.target.closest('.tab'); 
     if(tabBtn){ 
       state.tab = tabBtn.dataset.tab; 
-      state.editingVisitId = null; 
-      state.editingPartyId = null; 
-      state.editingSpId = null; 
-      state.selectedFormSpId = '';
       state.showSuccessToast = false;
       render(); 
       return; 
     }
-    if(e.target.id === 'exportCsvBtn'){ exportCsv(); return; }
     if(e.target.classList.contains('modal-backdrop')){ state.modal = null; render(); return; }
     const actionEl = e.target.closest('[data-action]'); if(!actionEl) return;
     const action = actionEl.dataset.action; const id = actionEl.dataset.id;
 
-    if(action === 'close-modal'){ state.modal = null; render(); }
+    if(action === 'filter-pending') {
+      state.pendingFilterSpId = actionEl.dataset.spid;
+      render();
+    }
+    else if(action === 'clear-pending-filter') {
+      state.pendingFilterSpId = 'all';
+      render();
+    }
+    else if(action === 'close-modal'){ state.modal = null; render(); }
     else if(action === 'view-party'){ state.modal = {type:'party', id:id}; render(); }
     else if(action === 'view-sp'){ state.modal = {type:'sp', id:id}; render(); }
     else if(action === 'edit-visit'){ state.editingVisitId = id; state.tab = 'addvisit'; render(); }
-    else if(action === 'cancel-edit-visit'){ state.editingVisitId = null; state.selectedFormSpId = ''; render(); }
-    else if(action === 'delete-visit'){ if(confirm('Delete this visit log entry?')){ await db.collection("visits").doc(id).delete(); } }
+    else if(action === 'delete-visit'){ if(confirm('Delete log?')){ await db.collection("visits").doc(id).delete(); } }
     else if(action === 'edit-party'){ state.editingPartyId = id; render(); }
-    else if(action === 'cancel-edit-party'){ state.editingPartyId = null; render(); }
-    else if(action === 'delete-party'){ if(confirm('Delete this client account?')){ state.editingPartyId = null; await db.collection("parties").doc(id).delete(); } }
+    else if(action === 'delete-party'){ if(confirm('Delete client?')){ await db.collection("parties").doc(id).delete(); } }
     else if(action === 'edit-sp'){ state.editingSpId = id; render(); }
-    else if(action === 'cancel-edit-sp'){ state.editingSpId = null; render(); }
-    else if(action === 'delete-sp'){ if(confirm('Remove this sales person from registry?')){ state.editingSpId = null; await db.collection("salespeople").doc(id).delete(); } }
+    else if(action === 'delete-sp'){ if(confirm('Remove team member?')){ await db.collection("salespeople").doc(id).delete(); } }
   });
 
   document.addEventListener('submit', async function(e){
@@ -904,59 +831,36 @@
       const spId = document.getElementById('vSp').value; const partyId = document.getElementById('vParty').value;
       const date = document.getElementById('vDate').value; const discussion = document.getElementById('vDiscussion').value.trim();
       const outcome = document.getElementById('vOutcome').value.trim(); const existingId = document.getElementById('vId').value;
-      if(!spId || !partyId || !date || !discussion) return;
       
       const targetId = existingId ? existingId : uid('v');
       await saveVisitCloud(targetId, { spId:spId, partyId:partyId, date:date, discussion:discussion, outcome:outcome });
       
-      if (existingId) {
-        state.editingVisitId = null;
-        state.selectedFormSpId = '';
-        state.tab = 'visitlog';
-        render();
-      } else {
-        state.selectedFormSpId = ''; 
-        state.showSuccessToast = true; 
-        render();
-        
-        const inputFocus = document.getElementById('vSp');
-        if(inputFocus) inputFocus.focus();
-        
-        setTimeout(function(){
-          state.showSuccessToast = false;
-          const toast = document.getElementById('successToast');
-          if(toast) toast.style.display = 'none';
-        }, 3000);
-      }
+      state.editingVisitId = null; state.selectedFormSpId = '';
+      state.tab = 'visitlog'; render();
     }
     else if(e.target.id === 'partyForm'){
       const name = document.getElementById('pName').value.trim(); const location = document.getElementById('pLocation').value.trim();
-      const contact = document.getElementById('pContact').value.trim(); const phone = document.getElementById('pPhone').value.trim();
       const assignedSpId = document.getElementById('pAssignedSp').value; const existingId = document.getElementById('pId').value;
-      if(!name) return;
       const targetId = existingId ? existingId : uid('p');
-      await savePartyCloud(targetId, { name:name, location:location, contact:contact, phone:phone, assignedSpId:assignedSpId });
-      state.editingPartyId = null; e.target.reset(); render();
+      await savePartyCloud(targetId, { name:name, location:location, assignedSpId:assignedSpId });
+      state.editingPartyId = null; render();
     }
     else if(e.target.id === 'spForm'){
       const name = document.getElementById('sName').value.trim(); const region = document.getElementById('sRegion').value.trim();
-      const existingId = document.getElementById('sId').value; if(!name) return;
+      const existingId = document.getElementById('sId').value;
       const targetId = existingId ? existingId : uid('s');
       await saveSalespersonCloud(targetId, { name:name, region:region });
-      state.editingSpId = null; e.target.reset(); render();
+      state.editingSpId = null; render();
     }
   });
 
-  document.addEventListener('change', async function(e){
+  document.addEventListener('change', function(e){
     if(e.target.id === 'dashMonthSelect'){ state.dashMonth = e.target.value; render(); }
     else if(e.target.id === 'dashSpSelect'){ state.dashSp = e.target.value; render(); }
     else if(e.target.id === 'logSpFilter'){ state.logFilters.sp = e.target.value; render(); }
     else if(e.target.id === 'logPartyFilter'){ state.logFilters.party = e.target.value; render(); }
-    else if(e.target.id === 'logMonthFilter'){ state.logFilters.month = e.target.value; render(); }
-    else if(e.target.id === 'vSp'){ 
-      state.selectedFormSpId = e.target.value; 
-      render(); 
-    }
+    else if(e.target.id === 'logTimeframeFilter'){ state.logFilters.timeframe = e.target.value; render(); }
+    else if(e.target.id === 'vSp'){ state.selectedFormSpId = e.target.value; render(); }
   });
 
   document.addEventListener('input', function(e){ if(e.target.id === 'logSearch'){ state.logFilters.search = e.target.value; render(); } });
